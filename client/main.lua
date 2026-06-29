@@ -107,9 +107,11 @@ local function pushSceneUpdate()
     if not isOnContract or contractPhase ~= 'scene' then return end
     SendNUIMessage({
         action = 'updateScene',
-        heat   = currentHeat,
-        timer  = timeLeftFormatted(),
-        tasks  = { bodies = completedTasks.bodies, surfaces = completedTasks.surfaces, evidence = completedTasks.evidence },
+        data   = {
+            heat  = currentHeat,
+            timer = timeLeftFormatted(),
+            tasks = { bodies = completedTasks.bodies, surfaces = completedTasks.surfaces, evidence = completedTasks.evidence },
+        },
     })
 end
 
