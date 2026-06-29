@@ -299,6 +299,32 @@ RegisterNetEvent('187cleaner:register', function()
     end)
 end)
 
+RegisterNetEvent('187cleaner:unregister', function()
+    local src = source
+    if src <= 0 then return end
+    if activeContracts[src] then
+        Framework.notify(src, Locale['unregister_on_contract'], 'error')
+        return
+    end
+
+    local identifier = getIdentifier(src)
+    if not identifier then return end
+
+    fetchPlayer(identifier, function(result)
+        if not result or not result[1] then
+            Framework.notify(src, Locale['not_registered'], 'error')
+            return
+        end
+        MySQL.query('DELETE FROM `187cleaner_players` WHERE identifier = ?', { identifier })
+        MySQL.query('DELETE FROM `187cleaner_evidence` WHERE identifier = ?', { identifier })
+        cooldowns[src]          = nil
+        repBlacklist[src]       = nil
+        betrayalTimestamps[src] = nil
+        TriggerClientEvent('187cleaner:unregistered', src)
+        log('Unregistered: ' .. identifier)
+    end)
+end)
+
 RegisterNetEvent('187cleaner:acceptContract', function(data)
     local src = source
     if src <= 0 or type(data) ~= 'table' then return end

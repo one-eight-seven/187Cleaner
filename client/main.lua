@@ -562,6 +562,13 @@ RegisterNetEvent('187cleaner:betrayalDiscovered', function()
     PlaySoundFrontend(-1, 'RACE_PLACED', 'HUD_AWARDS', true)
 end)
 
+RegisterNetEvent('187cleaner:unregistered', function()
+    isRegistered  = false
+    playerKitTier = 0
+    cleanupContactNpcs()
+    lib.notify({ title = '187 Cleaner', description = Locale['unregister_success'], type = 'inform' })
+end)
+
 RegisterNetEvent('187cleaner:repBlacklisted', function(tier)
     lib.notify({ title = '187 Cleaner', description = string.format(Locale['rep_blacklisted'], tier), type = 'error' })
 end)
@@ -593,6 +600,18 @@ end)
 -- 6. Key mappings & commands
 RegisterCommand('cleanerregister', function()
     TriggerServerEvent('187cleaner:register')
+end, false)
+
+RegisterCommand('cleanerleave', function()
+    if not isRegistered then
+        lib.notify({ title = '187 Cleaner', description = Locale['not_registered'], type = 'error' })
+        return
+    end
+    if isOnContract then
+        lib.notify({ title = '187 Cleaner', description = Locale['unregister_on_contract'], type = 'error' })
+        return
+    end
+    TriggerServerEvent('187cleaner:unregister')
 end, false)
 
 RegisterCommand('cleanerstats', function()

@@ -91,5 +91,9 @@ Locale['action_cancelled']        = 'Action cancelled.'
 -- Progression
 Locale['rep_tier_unlocked']       = 'Reputation unlocked — Tier %d contracts now available.'
 
+-- Unregister
+Locale['unregister_success']      = 'You have left the cleaner network. All records deleted.'
+Locale['unregister_on_contract']  = 'Cannot leave while on an active contract.'
+
 -- Admin
 Locale['no_permission']           = 'You do not have permission to use this command.'
