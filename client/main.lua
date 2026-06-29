@@ -7,7 +7,7 @@ local isRegistered     = false
 local isOnContract     = false
 local contractData     = nil
 local contractPhase    = 'none'   -- 'none' | 'scene' | 'disposal'
-local completedTasks   = { bodies = {}, surfaces = {}, evidence = {} }
+local completedTasks   = { bodies = {}, surfaces = {}, evidence = {}, uvEvidence = {} }
 local currentHeat      = 0
 local contractStartTick= 0        -- GetGameTimer() value at contract start
 local contractTimeWindow = 0      -- seconds
@@ -99,7 +99,7 @@ local function cleanupContract()
     isOnContract       = false
     contractData       = nil
     contractPhase      = 'none'
-    completedTasks     = { bodies = {}, surfaces = {}, evidence = {} }
+    completedTasks     = { bodies = {}, surfaces = {}, evidence = {}, uvEvidence = {} }
     currentHeat        = 0
     contractStartTick  = 0
     contractTimeWindow = 0
@@ -208,6 +208,32 @@ local function collectEvidence(index)
     })
 end
 
+local function collectUvEvidence(index)
+    if completedTasks.uvEvidence[index] then return end
+    completedTasks.uvEvidence[index] = true
+
+    local success = lib.progressBar({
+        duration   = 3500,
+        label      = Locale['task_collect_uv'],
+        useWhileDead = false,
+        canCancel  = true,
+        disable    = { move = true, car = true, combat = true },
+        anim       = { dict = 'anim@heists@ornate_bank@hack', clip = 'hack_loop', flag = 49 },
+    })
+
+    if not success then
+        completedTasks.uvEvidence[index] = false
+        return
+    end
+
+    PlaySoundFrontend(-1, 'SCAN_UP', 'SCANNING_SOUNDSET', true)
+    TriggerServerEvent('187cleaner:uvEvidenceCollected', {
+        contractId = contractData.contractId,
+        index      = index,
+    })
+    lib.notify({ title = '187 Cleaner', description = Locale['uv_evidence_collected'], type = 'success' })
+end
+
 local function doDisposal()
     local site = contractData.disposalSite
 
@@ -249,15 +275,6 @@ end
 -- 4. NUI Callbacks
 RegisterNUICallback('close', function(_, cb)
     SetNuiFocus(false, false)
-    cb('ok')
-end)
-
-RegisterNUICallback('acceptContract', function(data, cb)
-    -- Handled by key press in Lua (see contract notification handler)
-    cb('ok')
-end)
-
-RegisterNUICallback('declineContract', function(data, cb)
     cb('ok')
 end)
 
@@ -424,7 +441,6 @@ end)
 
 RegisterNetEvent('187cleaner:witnessAppeared', function(sceneCoords)
     if witnessHandled then return end
-    witnessHandled = false
     PlaySoundFrontend(-1, 'RACE_PLACED', 'HUD_AWARDS', true)
     SetNuiFocus(true, true)
     SendNUIMessage({
@@ -479,6 +495,12 @@ RegisterNetEvent('187cleaner:upgradeFailed', function(reason)
     lib.notify({ title = '187 Cleaner', description = Locale[reason] or Locale['not_enough_money'], type = 'error' })
 end)
 
+RegisterNetEvent('187cleaner:uvEvidenceAck', function(data)
+    if not data or not data.index then return end
+    completedTasks.uvEvidence[data.index] = true
+    lib.notify({ title = '187 Cleaner', description = Locale['uv_evidence_rewarded'], type = 'success' })
+end)
+
 RegisterNetEvent('187cleaner:betrayalDiscovered', function()
     lib.notify({ title = '187 Cleaner', description = Locale['betrayal_discovered'], type = 'error' })
     PlaySoundFrontend(-1, 'RACE_PLACED', 'HUD_AWARDS', true)
@@ -505,7 +527,7 @@ end)
 
 RegisterNetEvent('187cleaner:evidenceSold', function(data)
     lib.notify({ title = '187 Cleaner', description = string.format(Locale['evidence_sold'], data.amount), type = 'success' })
-    SendNUIMessage({ action = 'brokerItemSold', id = data.id })
+    SendNUIMessage({ action = 'brokerItemSold', data = { id = data.id } })
 end)
 
 -- 6. Key mappings & commands
@@ -557,6 +579,15 @@ Citizen.CreateThread(function()
                 if not completedTasks.evidence[i] and #(pCoords - ev.coords) < 2.0 then
                     showHint(Locale['hint_collect_evidence'])
                     if IsControlJustPressed(0, 38) then collectEvidence(i) end
+                end
+            end
+
+            if playerKitTier >= 2 and contractData.tasks.uvEvidence then
+                for i, uv in pairs(contractData.tasks.uvEvidence) do
+                    if not completedTasks.uvEvidence[i] and #(pCoords - uv.coords) < 2.0 then
+                        showHint(Locale['hint_collect_uv'])
+                        if IsControlJustPressed(0, 38) then collectUvEvidence(i) end
+                    end
                 end
             end
 
@@ -682,6 +713,16 @@ Citizen.CreateThread(function()
                     DrawMarker(2, ev.coords.x, ev.coords.y, ev.coords.z,
                         0.0,0.0,0.0, 0.0,0.0,0.0, 0.35,0.35,0.35,
                         255,210,0,190, false, false, 2, false, nil, nil, false)
+                end
+            end
+
+            if playerKitTier >= 2 and contractData.tasks.uvEvidence then
+                for i, uv in pairs(contractData.tasks.uvEvidence) do
+                    if not completedTasks.uvEvidence[i] and #(pCoords - uv.coords) < DRAW_DIST then
+                        DrawMarker(2, uv.coords.x, uv.coords.y, uv.coords.z,
+                            0.0,0.0,0.0, 0.0,0.0,0.0, 0.25,0.25,0.25,
+                            160,0,255,200, false, false, 2, false, nil, nil, false)
+                    end
                 end
             end
 

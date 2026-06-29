@@ -25,6 +25,12 @@ Locale['task_collect_evidence']   = 'Collecting evidence...'
 Locale['body_bagged']             = 'Body bagged.'
 Locale['surface_cleaned']         = 'Surface cleaned.'
 
+-- UV Scanner (Kit Tier 2)
+Locale['task_collect_uv']         = 'Scanning UV trace...'
+Locale['hint_collect_uv']         = 'Press ~INPUT_CONTEXT~ to scan UV evidence'
+Locale['uv_evidence_collected']   = 'UV trace collected. Reward pending.'
+Locale['uv_evidence_rewarded']    = 'UV evidence processed. +7 Cleaner Rep.'
+
 -- Hints
 Locale['hint_bag_body']           = 'Press ~INPUT_CONTEXT~ to bag the body'
 Locale['hint_clean_surface']      = 'Press ~INPUT_CONTEXT~ to clean the surface'

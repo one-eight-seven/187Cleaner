@@ -3,12 +3,32 @@
 -- ============================================================
 
 -- 1. Local state
-local activeContracts = {}   -- [src] = contractData
-local cooldowns       = {}   -- [src] = ms timestamp of last contract end
-local repBlacklist    = {}   -- [src][tier] = os.time() expiry
-local betrayalCount   = {}   -- [src] = integer within rolling window
+local activeContracts    = {}   -- [src] = contractData
+local cooldowns          = {}   -- [src] = ms timestamp of last contract end
+local repBlacklist       = {}   -- [src][tier] = os.time() expiry
+local betrayalTimestamps = {}   -- [src] = { unix_timestamps } — 24h rolling window
 
 -- 2. Helper functions
+
+local function recordBetrayal(src, tier)
+    local now    = os.time()
+    local cutoff = now - 86400
+    local fresh  = {}
+    for _, t in pairs(betrayalTimestamps[src] or {}) do
+        if t > cutoff then fresh[#fresh + 1] = t end
+    end
+    fresh[#fresh + 1]      = now
+    betrayalTimestamps[src] = fresh
+
+    if #fresh >= Config.BlacklistThreshold then
+        betrayalTimestamps[src] = {}  -- reset window
+        if not repBlacklist[src] then repBlacklist[src] = {} end
+        repBlacklist[src][tier] = now + Config.BlacklistDuration
+        return #fresh, true
+    end
+    return #fresh, false
+end
+
 local function try187Export(res, fn, ...)
     if GetResourceState(res) == 'started' then
         return exports[res][fn](...)
@@ -94,6 +114,14 @@ local function generateContract(src, tier)
         evidence[i] = { index = i, coords = vector3(center.x + ox, center.y + oy, center.z), type = et.id, label = et.label, pocketValue = et.pocketValue, completed = false, decision = nil }
     end
 
+    local uvEvidence = {}
+    local uvCount    = math.random(1, 2)
+    for i = 1, uvCount do
+        local ox, oy = randomOffset(8.0)
+        local et     = Config.EvidenceItems[math.random(#Config.EvidenceItems)]
+        uvEvidence[i] = { index = i, coords = vector3(center.x + ox, center.y + oy, center.z), type = 'uv_' .. et.id, label = 'UV Trace', pocketValue = math.floor(et.pocketValue * 0.5), completed = false, decision = nil }
+    end
+
     local disposal    = Config.DisposalSites[math.random(#Config.DisposalSites)]
     local timeWindow  = Config.ContractTimeWindows[tier]
     local basePayout  = Config.PayoutTier[tier]
@@ -106,7 +134,7 @@ local function generateContract(src, tier)
         payoutMax    = math.floor(basePayout * 1.1),
         sceneCoords  = center,
         disposalSite = { coords = disposal.coords, type = disposal.type, label = disposal.label },
-        tasks        = { bodies = bodies, surfaces = surfaces, evidence = evidence },
+        tasks        = { bodies = bodies, surfaces = surfaces, evidence = evidence, uvEvidence = uvEvidence },
         heat         = 0,
         heatMaxed    = false,
         startTime    = os.time(),
@@ -268,6 +296,25 @@ RegisterNetEvent('187cleaner:declineContract', function(data)
     end
 end)
 
+RegisterNetEvent('187cleaner:uvEvidenceCollected', function(data)
+    local src = source
+    if src <= 0 or type(data) ~= 'table' then return end
+    if not activeContracts[src] or activeContracts[src].contractId ~= data.contractId then return end
+
+    local c = activeContracts[src]
+    local idx = tonumber(data.index)
+    if not idx or not c.tasks.uvEvidence[idx] then return end
+    if c.tasks.uvEvidence[idx].completed then return end
+
+    c.tasks.uvEvidence[idx].completed = true
+
+    local identifier = getIdentifier(src)
+    if identifier then
+        MySQL.query('UPDATE `187cleaner_players` SET cleaner_rep = cleaner_rep + 7 WHERE identifier = ?', { identifier })
+    end
+    TriggerClientEvent('187cleaner:uvEvidenceAck', src, { index = idx })
+end)
+
 RegisterNetEvent('187cleaner:taskComplete', function(data)
     local src = source
     if src <= 0 or type(data) ~= 'table' then return end
@@ -360,7 +407,7 @@ RegisterNetEvent('187cleaner:disposalComplete', function(data)
         bonusType  = 'time'
     end
 
-    local basePayout  = Config.PayoutTier[c.tier]
+    local basePayout  = math.random(c.payoutMin, c.payoutMax)
     local finalPayout = math.floor(basePayout * multiplier)
     Framework.addMoney(src, finalPayout)
 
@@ -398,15 +445,23 @@ RegisterNetEvent('187cleaner:witnessDecision', function(data)
     if not activeContracts[src] or activeContracts[src].contractId ~= data.contractId then return end
 
     local c = activeContracts[src]
-    c.witnessActive = false
 
     if data.decision == 'pay' then
         local money = Framework.getMoney(src)
         if money < Config.WitnessPayoffCost then
             Framework.notify(src, Locale['not_enough_money'], 'error')
-            return
+            return  -- witness still active; player must choose again
         end
         Framework.removeMoney(src, Config.WitnessPayoffCost)
+        c.witnessActive = false
+    elseif data.decision == 'report' then
+        local identifier = getIdentifier(src)
+        if identifier then
+            MySQL.query('UPDATE `187cleaner_players` SET cleaner_rep = GREATEST(0, cleaner_rep - 10) WHERE identifier = ?', { identifier })
+        end
+        c.witnessActive = false
+    elseif data.decision == 'ignore' then
+        c.witnessActive = false
     end
 end)
 
@@ -552,12 +607,8 @@ RegisterNetEvent('187cleaner:sellEvidence', function(data)
                 TriggerClientEvent('187cleaner:betrayalDiscovered', src)
                 MySQL.query('UPDATE `187cleaner_players` SET cleaner_rep = GREATEST(0, cleaner_rep - 15), betrayals = betrayals + 1 WHERE identifier = ?', { identifier })
 
-                betrayalCount[src] = (betrayalCount[src] or 0) + 1
-                if betrayalCount[src] >= Config.BlacklistThreshold then
-                    if not repBlacklist[src] then repBlacklist[src] = {} end
-                    -- Blacklist from tier based on evidence contract_tier
-                    repBlacklist[src][ev.contract_tier] = os.time() + Config.BlacklistDuration
-                    betrayalCount[src] = 0
+                local _, blacklisted = recordBetrayal(src, ev.contract_tier)
+                if blacklisted then
                     TriggerClientEvent('187cleaner:repBlacklisted', src, ev.contract_tier)
                 end
             end)
@@ -701,12 +752,7 @@ end)
 
 AddEventHandler('playerDropped', function()
     local src = source
-    if activeContracts[src] then
-        local identifier = getIdentifier(src)
-        if identifier then
-            incrementStat(identifier, 'total_contracts', 1)
-        end
-        activeContracts[src] = nil
-    end
-    cooldowns[src] = GetGameTimer()
+    activeContracts[src] = nil
+    cooldowns[src]       = GetGameTimer()
+    betrayalTimestamps[src] = nil
 end)

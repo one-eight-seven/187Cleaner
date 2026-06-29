@@ -32,7 +32,7 @@ function Section({ title, icon, items, completed }) {
                 {icon} {title}
             </div>
             {items.map((_, i) => (
-                <TaskRow key={i} label={`${title} ${i + 1}`} done={!!completed[i + 1]} />
+                <TaskRow key={i} label={`${title} ${i + 1}`} done={!!completed[i]} />
             ))}
         </div>
     )

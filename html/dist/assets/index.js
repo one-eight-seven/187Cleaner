@@ -85,7 +85,7 @@ const ScenePanel = (() => {
     function renderTasks(tasks, completedMap) {
         if (!tasks || tasks.length === 0) return '';
         const rows = tasks.map((_, i) => {
-            const done = !!completedMap[i + 1];
+            const done = !!completedMap[i];
             return `<div class="task-row ${done ? 'done' : 'pending'}">
                 <div class="task-check ${done ? 'checked' : ''}">${done ? '✓' : ''}</div>
                 <span>Task ${i + 1}</span>
@@ -641,7 +641,7 @@ window.addEventListener('message', (e) => {
 
         case 'openBroker':           BrokerPanel.open(data);     break;
         case 'hideBroker':           BrokerPanel.close();        break;
-        case 'brokerItemSold':       BrokerPanel.removeSold(e.data.id); break;
+        case 'brokerItemSold':       BrokerPanel.removeSold(e.data.data && e.data.data.id); break;
 
         case 'showPayout':           PayoutScreen.open(data);    break;
         case 'hidePayout':           PayoutScreen.close();       break;
