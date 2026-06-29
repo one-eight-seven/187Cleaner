@@ -44,6 +44,16 @@ export default function ContractNotification({ data }) {
                 <span style={{ fontSize: '12px', color: '#94a3b8' }}>{fmt(countdown)}</span>
             </div>
 
+            {data.flavour && (
+                <div style={{
+                    fontSize: '12px', color: '#64748b', fontStyle: 'italic',
+                    marginBottom: '10px', lineHeight: '1.5',
+                    borderLeft: '2px solid rgba(255,255,255,0.06)', paddingLeft: '8px',
+                }}>
+                    {data.flavour}
+                </div>
+            )}
+
             <div style={{ fontSize: '13px', color: '#94a3b8', marginBottom: '12px', lineHeight: '1.5' }}>
                 <div>Payout: <span style={{ color: '#f1f5f9', fontWeight: 600 }}>
                     ${data.payoutMin?.toLocaleString()} – ${data.payoutMax?.toLocaleString()}

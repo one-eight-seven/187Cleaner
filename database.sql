@@ -12,6 +12,8 @@ CREATE TABLE IF NOT EXISTS `187cleaner_players` (
     `evidence_destroyed` INT            NOT NULL DEFAULT 0,
     `betrayals`          INT            NOT NULL DEFAULT 0,
     `fastest_clean`      INT            NOT NULL DEFAULT 0  COMMENT 'seconds',
+    `current_streak`     INT            NOT NULL DEFAULT 0  COMMENT 'consecutive clean contracts (no evidence pocketed)',
+    `best_streak`        INT            NOT NULL DEFAULT 0,
     `created_at`         TIMESTAMP      NOT NULL DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 

@@ -103,7 +103,34 @@ export default function StatsPanel({ data, onClose }) {
                             <div className="stat-value">${fmt(data.evidenceSoldValue)}</div>
                             <div className="stat-label">Broker Revenue</div>
                         </div>
+                        <div className="stat-card" style={{ gridColumn: 'span 2' }}>
+                            <div className="stat-value">{data.currentStreak || 0}🔥</div>
+                            <div className="stat-label">Clean Streak (Best: {data.bestStreak || 0})</div>
+                        </div>
                     </div>
+
+                    {/* Server Records */}
+                    {data.leaderboard && data.leaderboard.length > 0 && (
+                        <>
+                            <div className="divider" style={{ margin: '14px 0 10px' }} />
+                            <div style={{ fontSize: '11px', color: '#8b5cf6', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '8px' }}>
+                                Server Records — Fastest Clean
+                            </div>
+                            {data.leaderboard.map((row, i) => (
+                                <div key={i} style={{
+                                    display: 'flex', justifyContent: 'space-between',
+                                    padding: '6px 10px', borderRadius: '6px',
+                                    background: i === 0 ? 'rgba(139,92,246,0.1)' : 'rgba(255,255,255,0.03)',
+                                    marginBottom: '4px', fontSize: '12px',
+                                }}>
+                                    <span style={{ color: i === 0 ? '#a78bfa' : '#94a3b8' }}>
+                                        #{i + 1} {row.identifier.substring(0, 12)}…
+                                    </span>
+                                    <span style={{ color: '#f1f5f9', fontWeight: 600 }}>{fmtTime(row.fastest_clean)}</span>
+                                </div>
+                            ))}
+                        </>
+                    )}
                 </div>
             </div>
         </div>

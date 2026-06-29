@@ -35,8 +35,9 @@ function App() {
                 case 'openShop':       setShopData(data);   break
                 case 'hideShop':       setShopData(null);   break
                 case 'updateShop':     setShopData(d => d ? { ...d, ...data } : null); break
-                case 'openStats':      setStatsData(data);  break
-                case 'hideStats':      setStatsData(null);  break
+                case 'openStats':          setStatsData(data);  break
+                case 'hideStats':          setStatsData(null);  break
+                case 'updateLeaderboard':  setStatsData(d => d ? { ...d, leaderboard: data } : null); break
                 case 'openBroker':     setBrokerData(data); break
                 case 'hideBroker':     setBrokerData(null); break
                 case 'brokerItemSold': setBrokerData(d => d ? { ...d, evidence: d.evidence.filter(e => e.id !== data.id) } : null); break

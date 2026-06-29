@@ -43,6 +43,7 @@ const ContractNotif = (() => {
                 </div>
                 <span class="cn-countdown" id="cn-cd">${fmtCountdown(60)}</span>
             </div>
+            ${data.flavour ? `<div style="font-size:12px;color:#64748b;font-style:italic;margin-bottom:10px;line-height:1.5;border-left:2px solid rgba(255,255,255,0.06);padding-left:8px;">${data.flavour}</div>` : ''}
             <div class="cn-details">
                 Payout: <span>$${fmt(data.payoutMin)} – $${fmt(data.payoutMax)}</span><br>
                 Window: <span>${Math.floor((data.timeWindow||480)/60)} min</span>
@@ -462,11 +463,26 @@ const StatsPanel = (() => {
                     ${statCard(fmt(data.betrayals),         'Betrayals')}
                     ${statCard(fmtSec(data.fastestClean),   'Fastest Clean', 2)}
                     ${statCard('$' + fmt(data.evidenceSoldValue), 'Broker Revenue', 2)}
+                    ${statCard((data.currentStreak||0)+'🔥', 'Clean Streak (Best: '+(data.bestStreak||0)+')', 2)}
                 </div>
+                <div id="stats-leaderboard"></div>
             </div>
         `;
 
         show('stats-panel');
+    }
+
+    function updateLeaderboard(lb) {
+        const el2 = document.getElementById('stats-leaderboard');
+        if (!el2 || !lb || !lb.length) return;
+        el2.innerHTML = `
+            <hr style="border:none;border-top:1px solid rgba(255,255,255,0.06);margin:14px 0 10px;">
+            <div style="font-size:11px;color:#8b5cf6;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;">Server Records — Fastest Clean</div>
+            ${lb.map((r,i) => `<div style="display:flex;justify-content:space-between;padding:6px 10px;border-radius:6px;background:${i===0?'rgba(139,92,246,.1)':'rgba(255,255,255,.03)'};margin-bottom:4px;font-size:12px;">
+                <span style="color:${i===0?'#a78bfa':'#94a3b8'}">#${i+1} ${(r.identifier||'').substring(0,12)}…</span>
+                <span style="color:#f1f5f9;font-weight:600;">${fmtSec(r.fastest_clean)}</span>
+            </div>`).join('')}
+        `;
     }
 
     function close() {
@@ -474,7 +490,7 @@ const StatsPanel = (() => {
         S187.post('closeStats');
     }
 
-    return { open, close };
+    return { open, close, updateLeaderboard };
 })();
 
 window.StatsPanel = StatsPanel;
@@ -637,8 +653,9 @@ window.addEventListener('message', (e) => {
         case 'openShop':             ShopPanel.open(data);       break;
         case 'hideShop':             ShopPanel.close();          break;
 
-        case 'openStats':            StatsPanel.open(data);      break;
-        case 'hideStats':            StatsPanel.close();         break;
+        case 'openStats':            StatsPanel.open(data);            break;
+        case 'hideStats':            StatsPanel.close();               break;
+        case 'updateLeaderboard':    StatsPanel.updateLeaderboard(data); break;
 
         case 'openBroker':           BrokerPanel.open(data);     break;
         case 'hideBroker':           BrokerPanel.close();        break;

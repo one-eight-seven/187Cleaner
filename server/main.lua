@@ -7,6 +7,7 @@ local activeContracts    = {}   -- [src] = contractData
 local cooldowns          = {}   -- [src] = ms timestamp of last contract end
 local repBlacklist       = {}   -- [src][tier] = os.time() expiry
 local betrayalTimestamps = {}   -- [src] = { unix_timestamps } — 24h rolling window
+local activeBrokerIndex  = 1    -- daily rotating broker location (1-based)
 
 -- 2. Helper functions
 
@@ -138,6 +139,8 @@ local function generateContract(src, tier)
     local disposal    = Config.DisposalSites[math.random(#Config.DisposalSites)]
     local timeWindow  = Config.ContractTimeWindows[tier]
     local basePayout  = Config.PayoutTier[tier]
+    local flavourPool = Config.SceneFlavour and Config.SceneFlavour[tier]
+    local flavour     = flavourPool and flavourPool[math.random(#flavourPool)] or ''
 
     return {
         contractId   = tostring(os.time()) .. '_' .. tostring(src) .. '_' .. tostring(math.random(1000, 9999)),
@@ -145,6 +148,7 @@ local function generateContract(src, tier)
         timeWindow   = timeWindow,
         payoutMin    = math.floor(basePayout * 0.9),
         payoutMax    = math.floor(basePayout * 1.1),
+        flavour      = flavour,
         sceneCoords  = center,
         disposalSite = { coords = disposal.coords, type = disposal.type, label = disposal.label },
         tasks        = { bodies = bodies, surfaces = surfaces, evidence = evidence, uvEvidence = uvEvidence },
@@ -274,6 +278,22 @@ RegisterNetEvent('187cleaner:register', function()
             if res then
                 TriggerClientEvent('187cleaner:registered', src, { kitTier = 0 })
                 log('Registered: ' .. identifier)
+                -- Immediately offer a first contract without waiting for the dispatch loop
+                Citizen.SetTimeout(5000, function()
+                    if not isOnline(src) or activeContracts[src] then return end
+                    local contract = generateContract(src, 1)
+                    if contract then
+                        activeContracts[src] = contract
+                        TriggerClientEvent('187cleaner:receiveContract', src, {
+                            contractId = contract.contractId,
+                            tier       = contract.tier,
+                            timeWindow = contract.timeWindow,
+                            payoutMin  = contract.payoutMin,
+                            payoutMax  = contract.payoutMax,
+                            flavour    = contract.flavour,
+                        })
+                    end
+                end)
             end
         end)
     end)
@@ -387,7 +407,7 @@ RegisterNetEvent('187cleaner:evidenceDecision', function(data)
             Citizen.SetTimeout(math.random(5000, 25000), function()
                 if not isOnline(src) then return end
                 TriggerClientEvent('187cleaner:betrayalDiscovered', src)
-                MySQL.query('UPDATE `187cleaner_players` SET cleaner_rep = GREATEST(0, cleaner_rep - 10) WHERE identifier = ?', { identifier })
+                MySQL.query('UPDATE `187cleaner_players` SET cleaner_rep = GREATEST(0, cleaner_rep - 10), current_streak = 0, betrayals = betrayals + 1 WHERE identifier = ?', { identifier })
 
                 local _, blacklisted = recordBetrayal(src, c.tier)
                 if blacklisted then
@@ -425,24 +445,68 @@ RegisterNetEvent('187cleaner:disposalComplete', function(data)
         bonusType  = 'time'
     end
 
-    local basePayout  = math.random(c.payoutMin, c.payoutMax)
-    local finalPayout = math.floor(basePayout * multiplier)
-    Framework.addMoney(src, finalPayout)
+    -- Streak: did player pocket any evidence this contract?
+    local pocketedAny = false
+    for _, ev in pairs(c.tasks.evidence) do
+        if ev.decision == 'pocket' then pocketedAny = true; break end
+    end
 
     local identifier = getIdentifier(src)
-    if identifier then
-        MySQL.query([[
-            UPDATE `187cleaner_players` SET
-                total_contracts = total_contracts + 1,
-                total_earned    = total_earned + ?,
-                total_bodies    = total_bodies + ?,
-                broker_rep      = broker_rep + ?,
-                fastest_clean   = CASE WHEN fastest_clean = 0 OR ? < fastest_clean THEN ? ELSE fastest_clean END
-            WHERE identifier = ?
-        ]], { finalPayout, #c.tasks.bodies, math.random(2, 5), elapsed, elapsed, identifier }, function()
-            checkRepTierUnlock(src, identifier)
-        end)
+    -- Compute streak bonus before payout
+    local streakBonus = 0
+    if not pocketedAny and identifier then
+        -- We'll read streak from DB and apply bonus; use cached if available
     end
+
+    local basePayout  = math.random(c.payoutMin, c.payoutMax)
+    local finalPayout = math.floor(basePayout * multiplier)
+
+    if identifier then
+        fetchPlayer(identifier, function(rows)
+            local player      = rows and rows[1]
+            local oldStreak   = (player and player.current_streak) or 0
+            local newStreak   = pocketedAny and 0 or (oldStreak + 1)
+            local bestStreak  = (player and player.best_streak) or 0
+            local strBonus    = not pocketedAny and math.min(oldStreak, Config.MaxStreakBonus) * Config.StreakBonusPerContract or 0
+            local finalWithStreak = math.floor(finalPayout * (1.0 + strBonus))
+
+            Framework.addMoney(src, finalWithStreak)
+
+            MySQL.query([[
+                UPDATE `187cleaner_players` SET
+                    total_contracts = total_contracts + 1,
+                    total_earned    = total_earned + ?,
+                    total_bodies    = total_bodies + ?,
+                    broker_rep      = broker_rep + ?,
+                    fastest_clean   = CASE WHEN fastest_clean = 0 OR ? < fastest_clean THEN ? ELSE fastest_clean END,
+                    current_streak  = ?,
+                    best_streak     = GREATEST(best_streak, ?)
+                WHERE identifier = ?
+            ]], { finalWithStreak, #c.tasks.bodies, math.random(2, 5), elapsed, elapsed, newStreak, newStreak, identifier }, function()
+                checkRepTierUnlock(src, identifier)
+            end)
+
+            TriggerClientEvent('187cleaner:payoutScreen', src, {
+                tier        = c.tier,
+                base        = basePayout,
+                multiplier  = multiplier,
+                streakBonus = strBonus,
+                streak      = newStreak,
+                total       = finalWithStreak,
+                bonusType   = bonusType,
+                bodies      = #c.tasks.bodies,
+                elapsed     = elapsed,
+            })
+
+            activeContracts[src] = nil
+            cooldowns[src]       = GetGameTimer()
+            log('Contract complete — src:' .. src .. ' payout:$' .. finalWithStreak .. ' bonus:' .. bonusType .. ' streak:' .. newStreak)
+        end)
+        return  -- return early; payout triggered in callback
+    end
+
+    -- Fallback if no identifier (shouldn't happen)
+    Framework.addMoney(src, finalPayout)
 
     TriggerClientEvent('187cleaner:payoutScreen', src, {
         tier       = c.tier,
@@ -552,7 +616,15 @@ RegisterNetEvent('187cleaner:requestStats', function()
                 evidenceSoldValue= evTotal or 0,
                 betrayals        = p.betrayals         or 0,
                 fastestClean     = p.fastest_clean     or 0,
+                currentStreak    = p.current_streak    or 0,
+                bestStreak       = p.best_streak       or 0,
             })
+        end)
+
+        -- Leaderboard: attach asynchronously
+        MySQL.query('SELECT identifier, fastest_clean, total_contracts FROM `187cleaner_players` WHERE fastest_clean > 0 ORDER BY fastest_clean ASC LIMIT 5', {}, function(lb)
+            -- Send leaderboard as a separate update to not delay the stats panel open
+            TriggerClientEvent('187cleaner:leaderboardData', src, lb or {})
         end)
     end)
 end)
@@ -625,7 +697,7 @@ RegisterNetEvent('187cleaner:sellEvidence', function(data)
             Citizen.SetTimeout(math.random(3000, 15000), function()
                 if not isOnline(src) then return end
                 TriggerClientEvent('187cleaner:betrayalDiscovered', src)
-                MySQL.query('UPDATE `187cleaner_players` SET cleaner_rep = GREATEST(0, cleaner_rep - 15), betrayals = betrayals + 1 WHERE identifier = ?', { identifier })
+                MySQL.query('UPDATE `187cleaner_players` SET cleaner_rep = GREATEST(0, cleaner_rep - 15), betrayals = betrayals + 1, current_streak = 0 WHERE identifier = ?', { identifier })
 
                 local _, blacklisted = recordBetrayal(src, ev.contract_tier)
                 if blacklisted then
@@ -640,8 +712,13 @@ end)
 lib.callback.register('187cleaner:getStats', function(src)
     local identifier = getIdentifier(src)
     if not identifier then return nil end
-    local result = MySQL.query.await('SELECT * FROM `187cleaner_players` WHERE identifier = ?', { identifier })
-    return result and result[1] or nil
+    local result    = MySQL.query.await('SELECT * FROM `187cleaner_players` WHERE identifier = ?', { identifier })
+    local leaderboard = MySQL.query.await(
+        'SELECT identifier, fastest_clean, total_contracts FROM `187cleaner_players` WHERE fastest_clean > 0 ORDER BY fastest_clean ASC LIMIT 5'
+    )
+    local stats = result and result[1] or nil
+    if stats then stats.leaderboard = leaderboard or {} end
+    return stats
 end)
 
 -- 7. Admin commands
@@ -760,6 +837,30 @@ AddEventHandler('onResourceStart', function(resource)
             end
         end
     end)
+end)
+
+-- Broker daily rotation — compute once at start, refresh at midnight
+local function computeBrokerIndex()
+    return (os.time() // 86400) % #Config.BrokerLocations + 1
+end
+activeBrokerIndex = computeBrokerIndex()
+
+Citizen.CreateThread(function()
+    while true do
+        local now         = os.time()
+        local secondsToday = now % 86400
+        local waitSecs    = 86400 - secondsToday + 1
+        Citizen.Wait(waitSecs * 1000)
+        activeBrokerIndex = computeBrokerIndex()
+        TriggerAllClients('187cleaner:brokerLocationUpdated', activeBrokerIndex)
+        log('Broker location rotated to index ' .. activeBrokerIndex)
+    end
+end)
+
+RegisterNetEvent('187cleaner:requestBrokerIndex', function()
+    local src = source
+    if src <= 0 then return end
+    TriggerClientEvent('187cleaner:brokerLocationUpdated', src, activeBrokerIndex)
 end)
 
 AddEventHandler('onResourceStop', function(resource)

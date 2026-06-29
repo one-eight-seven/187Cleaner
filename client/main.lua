@@ -15,11 +15,39 @@ local activeBlips      = {}
 local isInScene        = false
 local witnessHandled   = false
 local playerKitTier    = 0        -- 0 = no upgrade, 1/2/3
-local contractAcceptKey = false   -- waiting for Y/N input
-local pendingContractId = nil
-local isDisposing       = false
+local contractAcceptKey  = false   -- waiting for Y/N input
+local pendingContractId  = nil
+local isDisposing        = false
+local activeBrokerIndex  = 1      -- set from server on resource start + daily rotation
+local contactNpcs        = {}
 
 -- 2. Helper / utility functions
+
+local function spawnContactNpcs()
+    if #contactNpcs > 0 then return end  -- already spawned
+    local MODEL_HASH = GetHashKey('s_m_y_garbage_01')
+    RequestModel(MODEL_HASH)
+    local t = 0
+    repeat Citizen.Wait(100); t = t + 100 until HasModelLoaded(MODEL_HASH) or t > 5000
+    for _, loc in pairs(Config.ContactLocations) do
+        local ped = CreatePed(4, MODEL_HASH, loc.x, loc.y, loc.z - 1.0, 0.0, false, true)
+        SetEntityInvincible(ped, true)
+        SetBlockingOfNonTemporaryEvents(ped, true)
+        FreezeEntityPosition(ped, true)
+        SetPedFleeAttributes(ped, 0, false)
+        SetPedCombatAttributes(ped, 17, true)
+        SetModelAsNoLongerNeeded(MODEL_HASH)
+        contactNpcs[#contactNpcs + 1] = ped
+    end
+end
+
+local function cleanupContactNpcs()
+    for _, ped in pairs(contactNpcs) do
+        if DoesEntityExist(ped) then DeleteEntity(ped) end
+    end
+    contactNpcs = {}
+end
+
 local function log(msg)
     if Config.Debug then print('[187Cleaner] ' .. tostring(msg)) end
 end
@@ -353,13 +381,22 @@ end)
 RegisterNetEvent('187cleaner:alreadyRegistered', function(data)
     isRegistered  = true
     playerKitTier = data.kitTier or 0
+    TriggerServerEvent('187cleaner:requestBrokerIndex')
+    Citizen.CreateThread(spawnContactNpcs)
     log('Player already registered — kit tier: ' .. playerKitTier)
 end)
 
 RegisterNetEvent('187cleaner:registered', function(data)
     isRegistered  = true
     playerKitTier = data.kitTier or 0
+    TriggerServerEvent('187cleaner:requestBrokerIndex')
+    Citizen.CreateThread(spawnContactNpcs)
     lib.notify({ title = '187 Cleaner', description = Locale['register_success'], type = 'success' })
+end)
+
+RegisterNetEvent('187cleaner:brokerLocationUpdated', function(idx)
+    activeBrokerIndex = idx
+    lib.notify({ title = '187 Cleaner', description = Locale['broker_location_updated'], type = 'inform' })
 end)
 
 RegisterNetEvent('187cleaner:receiveContract', function(data)
@@ -432,6 +469,17 @@ RegisterNetEvent('187cleaner:policeSweep', function()
     lib.notify({ title = '187 Cleaner', description = Locale['heat_maxed'], type = 'error' })
     AnimpostfxPlay('Damage', 500, false)
     PlaySoundFrontend(-1, 'CHECKPOINT_MISSED', 'HUD_MINI_GAME_SOUNDSET', true)
+
+    SetPlayerWantedLevel(PlayerId(), 1, false)
+    SetPlayerWantedLevelNow(PlayerId(), false)
+
+    Citizen.CreateThread(function()
+        local deadline = GetGameTimer() + 45000
+        while GetGameTimer() < deadline and isOnContract do
+            Citizen.Wait(1000)
+        end
+        ClearPlayerWantedLevel(PlayerId())
+    end)
 end)
 
 RegisterNetEvent('187cleaner:heatDropped', function(newHeat)
@@ -521,6 +569,10 @@ end)
 RegisterNetEvent('187cleaner:statsData', function(data)
     SetNuiFocus(true, true)
     SendNUIMessage({ action = 'openStats', data = data })
+end)
+
+RegisterNetEvent('187cleaner:leaderboardData', function(lb)
+    SendNUIMessage({ action = 'updateLeaderboard', data = lb })
 end)
 
 RegisterNetEvent('187cleaner:shopData', function(data)
@@ -632,12 +684,11 @@ Citizen.CreateThread(function()
             end
         end
 
-        for _, loc in pairs(Config.BrokerLocations) do
-            if #(pCoords - loc) < 3.0 then
-                showHint(Locale['hint_sell_evidence'])
-                if IsControlJustPressed(0, 38) then
-                    TriggerServerEvent('187cleaner:requestBroker')
-                end
+        local brokerLoc = Config.BrokerLocations[activeBrokerIndex]
+        if brokerLoc and #(pCoords - brokerLoc) < 3.0 then
+            showHint(Locale['hint_sell_evidence'])
+            if IsControlJustPressed(0, 38) then
+                TriggerServerEvent('187cleaner:requestBroker')
             end
         end
 
@@ -753,12 +804,11 @@ Citizen.CreateThread(function()
                         139,92,246,110, false, false, 2, false, nil, nil, false)
                 end
             end
-            for _, loc in pairs(Config.BrokerLocations) do
-                if #(pC - loc) < 40.0 then
-                    DrawMarker(21, loc.x, loc.y, loc.z,
-                        0.0,0.0,0.0, 0.0,0.0,0.0, 1.2,1.2,1.2,
-                        245,158,11,110, false, false, 2, false, nil, nil, false)
-                end
+            local bLoc = Config.BrokerLocations[activeBrokerIndex]
+            if bLoc and #(pC - bLoc) < 40.0 then
+                DrawMarker(21, bLoc.x, bLoc.y, bLoc.z,
+                    0.0,0.0,0.0, 0.0,0.0,0.0, 1.2,1.2,1.2,
+                    245,158,11,110, false, false, 2, false, nil, nil, false)
             end
         end
 
@@ -771,6 +821,7 @@ AddEventHandler('onResourceStop', function(resource)
     if resource ~= GetCurrentResourceName() then return end
     isOnContract = false
     clearAllBlips()
+    cleanupContactNpcs()
     SetNuiFocus(false, false)
     for _, action in pairs({ 'hideScene', 'hidePayout', 'hideBroker', 'hideShop', 'hideStats', 'hideContract', 'hideEvidence', 'hideWitness' }) do
         SendNUIMessage({ action = action })

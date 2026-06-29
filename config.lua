@@ -112,3 +112,32 @@ Config.KitUpgrades = {
     [2] = { name = 'UV Scanner Kit',  desc = 'Reveals hidden bonus evidence worth 3× · Double bag capacity', effect = 'uv' },
     [3] = { name = 'Chemical Kit',    desc = 'Heat gain rate –40% · Leaves no surface trace', effect = 'heat' },
 }
+
+-- Streak bonus system
+Config.StreakBonusPerContract = 0.02  -- +2% payout per consecutive clean contract
+Config.MaxStreakBonus         = 10    -- streak caps at 10 (+20% max)
+
+-- Scene flavour lines — random narrative context shown on contract notification
+Config.SceneFlavour = {
+    -- Tier 1
+    {
+        "A small-time deal gone wrong in a parking structure. One body, minimal mess.",
+        "Someone got careless after a poker game. Keep it quiet.",
+        "Back-alley dispute, escalated fast. Client says be done before first light.",
+        "Package pickup went bad. Client insists on no traces by morning.",
+    },
+    -- Tier 2
+    {
+        "Three parties met in a warehouse. Only the client walked out. Standard procedure.",
+        "A business meeting ended without minutes. You are the minutes.",
+        "Evidence of something expensive. Client says bury it, all of it.",
+        "Mid-tier contract — multiple parties, one outcome. Work fast.",
+    },
+    -- Tier 3
+    {
+        "Three bodies, a burnt phone, and a client who does not ask twice.",
+        "High-profile. Client says the scene cannot exist. Make that true.",
+        "The kind of night that erases careers. You are the erasure.",
+        "Multiple sites, multiple witnesses, multiple ways to fail. Don't.",
+    },
+}
