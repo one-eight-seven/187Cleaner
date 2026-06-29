@@ -17,6 +17,7 @@ local witnessHandled   = false
 local playerKitTier    = 0        -- 0 = no upgrade, 1/2/3
 local contractAcceptKey = false   -- waiting for Y/N input
 local pendingContractId = nil
+local isDisposing       = false
 
 -- 2. Helper / utility functions
 local function log(msg)
@@ -52,16 +53,6 @@ local function clearAllBlips()
     end
 end
 
-local function playAnim(dict, clip, dur, flags)
-    if not HasAnimDictLoaded(dict) then
-        RequestAnimDict(dict)
-        local timeout = 0
-        repeat Citizen.Wait(0); timeout = timeout + 1 until HasAnimDictLoaded(dict) or timeout > 100
-    end
-    TaskPlayAnim(cache.ped, dict, clip, 8.0, -8.0, dur, flags or 49, 0, false, false, false)
-    Citizen.Wait(dur)
-    ClearPedTasks(cache.ped)
-end
 
 local function timeLeftFormatted()
     if contractStartTick == 0 then return '--:--' end
@@ -113,6 +104,7 @@ local function cleanupContract()
 end
 
 local function startDisposalPhase()
+    if contractPhase == 'disposal' then return end
     contractPhase = 'disposal'
     removeBlip(activeBlips.scene)
     activeBlips.scene = nil
@@ -235,6 +227,9 @@ local function collectUvEvidence(index)
 end
 
 local function doDisposal()
+    if isDisposing then return end
+    isDisposing = true
+
     local site = contractData.disposalSite
 
     local animDict = site.type == 'ocean' and 'random@arrests' or 'mini@repair'
@@ -248,23 +243,27 @@ local function doDisposal()
         disable    = { move = true, car = true, combat = true },
         anim       = { dict = animDict, clip = animClip, flag = 49 },
     })
+    isDisposing = false
     if not success then return end
 
-    -- Particle
+    -- Particle (incinerator only)
     if site.type == 'incinerator' then
         local s = site.coords
-        if HasNamedPtfxAssetLoaded then
-            if not HasNamedPtfxAssetLoaded('core') then
-                RequestNamedPtfxAsset('core')
-                local t = 0
-                repeat Citizen.Wait(0); t = t + 1 until HasNamedPtfxAssetLoaded('core') or t > 60
-            end
-            UseParticleFxAssetNextCall('core')
-            StartParticleFxLoopedAtCoord('exp_grd_flare', s.x, s.y, s.z, 0, 0, 0, 1.5, false, false, false, false)
+        if not HasNamedPtfxAssetLoaded('core') then
+            RequestNamedPtfxAsset('core')
+            local t = 0
+            repeat Citizen.Wait(0); t = t + 1 until HasNamedPtfxAssetLoaded('core') or t > 60
         end
+        UseParticleFxAssetNextCall('core')
+        StartParticleFxLoopedAtCoord('exp_grd_flare', s.x, s.y, s.z, 0, 0, 0, 1.5, false, false, false, false)
     end
 
-    PlaySoundFromCoord(-1, 'ATM_WINDOW', 'SCRIPTS/ATMS', site.coords.x, site.coords.y, site.coords.z, 0, true, 20.0, false)
+    -- Per-type disposal sound
+    local sndMap = { incinerator = 'FIRE_CRACKLE', container = 'CARGO_THUD', ocean = 'WATER_SPLASH', junkyard = 'CARGO_THUD' }
+    local snd    = sndMap[site.type] or 'CARGO_THUD'
+    PlaySoundFromCoord(-1, snd, 'SCRIPTS/ATMS', site.coords.x, site.coords.y, site.coords.z, 0, true, 20.0, false)
+
+    lib.notify({ title = '187 Cleaner', description = Locale['disposal_complete'], type = 'success' })
 
     removeBlip(activeBlips.disposal)
     activeBlips.disposal = nil
@@ -422,7 +421,9 @@ RegisterNetEvent('187cleaner:heatUpdate', function(heat)
     currentHeat = heat
     pushSceneUpdate()
 
-    if heat >= 80 and heat < Config.MaxHeat then
+    if heat >= 90 and heat < Config.MaxHeat then
+        lib.notify({ title = '187 Cleaner', description = Locale['heat_critical'], type = 'error' })
+    elseif heat >= 80 and heat < 90 then
         lib.notify({ title = '187 Cleaner', description = Locale['heat_warning'], type = 'warning' })
     end
 end)
@@ -464,6 +465,8 @@ RegisterNetEvent('187cleaner:contractFailed', function()
 end)
 
 RegisterNetEvent('187cleaner:contractExpired', function(partialPayout)
+    AnimpostfxPlay('Damage', 500, false)
+    PlaySoundFrontend(-1, 'CHECKPOINT_MISSED', 'HUD_MINI_GAME_SOUNDSET', true)
     lib.notify({ title = '187 Cleaner', description = Locale['contract_expired'], type = 'warning' })
     if partialPayout and partialPayout > 0 then
         lib.notify({ title = '187 Cleaner', description = string.format(Locale['partial_payout'], partialPayout), type = 'inform' })
@@ -493,6 +496,11 @@ end)
 
 RegisterNetEvent('187cleaner:upgradeFailed', function(reason)
     lib.notify({ title = '187 Cleaner', description = Locale[reason] or Locale['not_enough_money'], type = 'error' })
+end)
+
+RegisterNetEvent('187cleaner:repTierUnlocked', function(tier)
+    lib.notify({ title = '187 Cleaner', description = string.format(Locale['rep_tier_unlocked'], tier), type = 'success' })
+    PlaySoundFrontend(-1, 'CHECKPOINT_PERFECT', 'HUD_MINI_GAME_SOUNDSET', true)
 end)
 
 RegisterNetEvent('187cleaner:uvEvidenceAck', function(data)
@@ -764,4 +772,7 @@ AddEventHandler('onResourceStop', function(resource)
     isOnContract = false
     clearAllBlips()
     SetNuiFocus(false, false)
+    for _, action in pairs({ 'hideScene', 'hidePayout', 'hideBroker', 'hideShop', 'hideStats', 'hideContract', 'hideEvidence', 'hideWitness' }) do
+        SendNUIMessage({ action = action })
+    end
 end)

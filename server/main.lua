@@ -75,6 +75,19 @@ local function addEvidenceDB(identifier, eType, value, tier)
         { identifier, eType, value, tier })
 end
 
+local function checkRepTierUnlock(src, identifier)
+    MySQL.query('SELECT cleaner_rep FROM `187cleaner_players` WHERE identifier = ?', { identifier }, function(res)
+        if not res or not res[1] then return end
+        local rep = res[1].cleaner_rep
+        -- Fire unlock notification when rep just crossed a tier threshold (within a 60-rep window to catch the contract that pushed them over)
+        if rep >= Config.RepTier3 and rep < Config.RepTier3 + 60 then
+            TriggerClientEvent('187cleaner:repTierUnlocked', src, 3)
+        elseif rep >= Config.RepTier2 and rep < Config.RepTier2 + 60 then
+            TriggerClientEvent('187cleaner:repTierUnlocked', src, 2)
+        end
+    end)
+end
+
 -- 4. Business logic functions
 local function isBlacklisted(src, tier)
     if not repBlacklist[src] then return false end
@@ -325,15 +338,23 @@ RegisterNetEvent('187cleaner:taskComplete', function(data)
     local idx = tonumber(data.taskIndex)
     if not idx then return end
 
+    local identifier = getIdentifier(src)
+
     if typ == 'body' and c.tasks.bodies[idx] and not c.tasks.bodies[idx].completed then
         c.tasks.bodies[idx].completed = true
         c.heat = math.max(0, c.heat + Config.HeatOnBody)
         TriggerClientEvent('187cleaner:heatUpdate', src, c.heat)
+        if identifier then
+            MySQL.query('UPDATE `187cleaner_players` SET cleaner_rep = cleaner_rep + 2 WHERE identifier = ?', { identifier })
+        end
 
     elseif typ == 'surface' and c.tasks.surfaces[idx] and not c.tasks.surfaces[idx].completed then
         c.tasks.surfaces[idx].completed = true
         c.heat = math.max(0, c.heat + Config.HeatOnSurface)
         TriggerClientEvent('187cleaner:heatUpdate', src, c.heat)
+        if identifier then
+            MySQL.query('UPDATE `187cleaner_players` SET cleaner_rep = cleaner_rep + 1 WHERE identifier = ?', { identifier })
+        end
     end
 end)
 
@@ -368,11 +389,8 @@ RegisterNetEvent('187cleaner:evidenceDecision', function(data)
                 TriggerClientEvent('187cleaner:betrayalDiscovered', src)
                 MySQL.query('UPDATE `187cleaner_players` SET cleaner_rep = GREATEST(0, cleaner_rep - 10) WHERE identifier = ?', { identifier })
 
-                betrayalCount[src] = (betrayalCount[src] or 0) + 1
-                if betrayalCount[src] >= Config.BlacklistThreshold then
-                    if not repBlacklist[src] then repBlacklist[src] = {} end
-                    repBlacklist[src][c.tier] = os.time() + Config.BlacklistDuration
-                    betrayalCount[src] = 0
+                local _, blacklisted = recordBetrayal(src, c.tier)
+                if blacklisted then
                     TriggerClientEvent('187cleaner:repBlacklisted', src, c.tier)
                 end
             end)
@@ -421,7 +439,9 @@ RegisterNetEvent('187cleaner:disposalComplete', function(data)
                 broker_rep      = broker_rep + ?,
                 fastest_clean   = CASE WHEN fastest_clean = 0 OR ? < fastest_clean THEN ? ELSE fastest_clean END
             WHERE identifier = ?
-        ]], { finalPayout, #c.tasks.bodies, math.random(2, 5), elapsed, elapsed, identifier })
+        ]], { finalPayout, #c.tasks.bodies, math.random(2, 5), elapsed, elapsed, identifier }, function()
+            checkRepTierUnlock(src, identifier)
+        end)
     end
 
     TriggerClientEvent('187cleaner:payoutScreen', src, {
@@ -744,10 +764,10 @@ end)
 
 AddEventHandler('onResourceStop', function(resource)
     if resource ~= GetCurrentResourceName() then return end
-    activeContracts = {}
-    cooldowns       = {}
-    repBlacklist    = {}
-    betrayalCount   = {}
+    activeContracts    = {}
+    cooldowns          = {}
+    repBlacklist       = {}
+    betrayalTimestamps = {}
 end)
 
 AddEventHandler('playerDropped', function()

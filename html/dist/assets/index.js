@@ -294,6 +294,7 @@ const WitnessModal = (() => {
         el('wt-report').onclick = () => decide('report');
 
         show('witness-modal');
+        S187.onEscape(() => decide('ignore'));
 
         let cd = 30;
         if (countdownInterval) clearInterval(countdownInterval);

@@ -14,6 +14,8 @@ export default function WitnessModal({ data, onClose }) {
         return () => clearInterval(id)
     }, [countdown, decide])
 
+    useEffect(() => { S187.onEscape(() => decide('ignore')) }, [decide])
+
     return (
         <div style={{
             position: 'fixed', inset: 0,

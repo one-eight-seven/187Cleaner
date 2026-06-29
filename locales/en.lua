@@ -88,5 +88,8 @@ Locale['broker_location_updated'] = 'The broker has moved to a new location.'
 Locale['not_enough_money']        = 'Insufficient funds.'
 Locale['action_cancelled']        = 'Action cancelled.'
 
+-- Progression
+Locale['rep_tier_unlocked']       = 'Reputation unlocked — Tier %d contracts now available.'
+
 -- Admin
 Locale['no_permission']           = 'You do not have permission to use this command.'
