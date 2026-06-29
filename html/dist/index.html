@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>187Scripts — 187Cleaner</title>
+  <link rel="stylesheet" href="lib/187.css">
+  <link rel="stylesheet" href="assets/index.css">
+</head>
+<body>
+
+  <!-- Contract notification (non-blocking, top-center) -->
+  <div id="contract-notif" class="contract-notif hidden"></div>
+
+  <!-- Scene assessment panel (non-blocking, top-left) -->
+  <div id="scene-panel" class="panel scene-panel hidden" style="width:290px;position:fixed;top:20px;left:20px;"></div>
+
+  <!-- Evidence decision modal (blocking, centered) -->
+  <div id="evidence-modal" class="modal-overlay hidden">
+    <div class="panel" style="width:460px;"></div>
+  </div>
+
+  <!-- Witness modal (blocking, centered) -->
+  <div id="witness-modal" class="modal-overlay hidden">
+    <div class="panel" style="width:440px;"></div>
+  </div>
+
+  <!-- Upgrade shop panel (blocking, centered) -->
+  <div id="shop-panel" class="modal-overlay hidden">
+    <div class="panel" style="width:520px;"></div>
+  </div>
+
+  <!-- Stats panel (blocking, centered) -->
+  <div id="stats-panel" class="modal-overlay hidden">
+    <div class="panel" style="width:620px;"></div>
+  </div>
+
+  <!-- Broker panel (blocking, centered) -->
+  <div id="broker-panel" class="modal-overlay hidden">
+    <div class="panel" style="width:500px;"></div>
+  </div>
+
+  <!-- Payout screen (overlay) -->
+  <div id="payout-screen" class="payout-overlay hidden"></div>
+
+  <script src="lib/187.js"></script>
+  <script src="assets/index.js"></script>
+</body>
+</html>

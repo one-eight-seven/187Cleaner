@@ -1,0 +1,255 @@
+/* 187Cleaner — dist styles */
+
+.hidden { display: none !important; }
+
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 300;
+}
+
+/* Contract notification */
+.contract-notif {
+  position: fixed;
+  top: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 360px;
+  background: rgba(14, 10, 28, 0.97);
+  border: 1px solid var(--glass-border);
+  border-left: 3px solid var(--accent);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow);
+  padding: 16px 18px;
+  animation: panelIn 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+  z-index: 200;
+  font-family: var(--font);
+}
+
+.contract-notif .cn-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.cn-tier-badge {
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+}
+
+.cn-title { font-size: 13px; font-weight: 600; }
+.cn-countdown { font-size: 12px; color: var(--text-secondary); }
+
+.cn-details {
+  font-size: 13px;
+  color: var(--text-secondary);
+  line-height: 1.6;
+  margin-bottom: 12px;
+}
+
+.cn-details span { color: var(--text-primary); font-weight: 600; }
+
+.cn-keys {
+  display: flex;
+  gap: 8px;
+  padding-top: 10px;
+  border-top: 1px solid var(--glass-border);
+}
+
+.cn-key {
+  flex: 1;
+  text-align: center;
+  padding: 7px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.cn-key-accept {
+  background: rgba(34, 197, 94, 0.12);
+  border: 1px solid rgba(34, 197, 94, 0.35);
+  color: #22c55e;
+}
+
+.cn-key-decline {
+  background: rgba(239, 68, 68, 0.10);
+  border: 1px solid rgba(239, 68, 68, 0.30);
+  color: #ef4444;
+}
+
+/* Scene panel */
+.scene-panel .panel-header { padding: 12px 14px 10px; }
+.scene-panel .panel-body   { padding: 12px 14px; }
+
+.sp-heat-row {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 4px;
+  font-size: 11px;
+}
+
+.sp-timer {
+  text-align: center;
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  margin-bottom: 10px;
+  font-variant-numeric: tabular-nums;
+}
+
+.task-section { margin-bottom: 10px; }
+.task-section-title {
+  font-size: 11px;
+  color: var(--accent);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 5px;
+}
+
+.task-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 8px;
+  border-radius: 6px;
+  margin-bottom: 3px;
+  transition: all 0.2s;
+  font-size: 12px;
+}
+
+.task-row.done {
+  background: rgba(34, 197, 94, 0.08);
+  color: var(--text-secondary);
+  text-decoration: line-through;
+}
+
+.task-row.pending { background: rgba(255, 255, 255, 0.03); }
+
+.task-check {
+  width: 16px;
+  height: 16px;
+  border-radius: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  font-size: 10px;
+}
+
+.task-check.checked {
+  background: #22c55e;
+  border-color: #22c55e;
+  color: #fff;
+}
+
+/* Evidence / Witness choice cards */
+.choice-grid { display: flex; gap: 12px; margin-top: 14px; }
+
+.choice-card {
+  flex: 1;
+  padding: 16px;
+  border-radius: 10px;
+  border: 1px solid var(--glass-border);
+  background: rgba(255, 255, 255, 0.03);
+  cursor: pointer;
+  text-align: center;
+  transition: all 0.15s ease;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.choice-card:hover { border-color: var(--accent); background: var(--glass-hover); }
+.choice-card .choice-icon { font-size: 22px; }
+.choice-card .choice-label { font-weight: 700; font-size: 14px; }
+.choice-card .choice-sub  { font-size: 11px; color: var(--text-secondary); }
+
+.choice-card.success-card { border-color: rgba(34,197,94,0.35); }
+.choice-card.success-card:hover { background: rgba(34,197,94,0.12); border-color: #22c55e; }
+
+.choice-card.warning-card { border-color: rgba(245,158,11,0.35); }
+.choice-card.warning-card:hover { background: rgba(245,158,11,0.12); border-color: #f59e0b; }
+
+.choice-card.accent-card { border-color: rgba(139,92,246,0.35); }
+.choice-card.accent-card:hover { background: rgba(139,92,246,0.12); border-color: var(--accent); }
+
+/* Auto-countdown text */
+.auto-countdown { text-align: center; margin-top: 12px; font-size: 12px; color: var(--text-muted); }
+
+/* Upgrade shop */
+.upgrade-list { display: flex; flex-direction: column; gap: 10px; }
+.upgrade-card {
+  padding: 16px;
+  border-radius: 12px;
+  border: 1px solid var(--glass-border);
+  background: rgba(255, 255, 255, 0.03);
+}
+.upgrade-card.owned { background: rgba(34, 197, 94, 0.08); border-color: rgba(34, 197, 94, 0.35); }
+
+.upgrade-header { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+.upgrade-icon   { font-size: 22px; }
+.upgrade-name   { font-weight: 600; font-size: 14px; }
+.upgrade-desc   { font-size: 12px; color: var(--text-secondary); margin-top: 2px; }
+
+.upgrade-footer { display: flex; align-items: center; justify-content: space-between; }
+.upgrade-price  { font-size: 15px; font-weight: 700; }
+
+/* Stats panel */
+.rep-section { margin-bottom: 14px; }
+.rep-label-row { display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 4px; }
+
+/* Payout overlay */
+.payout-overlay {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.35);
+  z-index: 400;
+}
+
+.payout-card {
+  background: rgba(14, 10, 28, 0.97);
+  border: 1px solid rgba(139, 92, 246, 0.4);
+  border-radius: 20px;
+  box-shadow: 0 0 60px rgba(139,92,246,0.25), var(--shadow);
+  padding: 40px 50px;
+  min-width: 380px;
+  text-align: center;
+  color: var(--text-primary);
+  animation: panelIn 0.4s ease;
+}
+
+.payout-subtitle  { font-size: 12px; color: var(--accent); text-transform: uppercase; letter-spacing: 2px; margin-bottom: 8px; }
+.payout-title     { font-size: 26px; font-weight: 700; margin-bottom: 24px; }
+.payout-line      { display: flex; justify-content: space-between; font-size: 14px; margin-bottom: 10px; }
+.payout-line span:first-child { color: var(--text-secondary); }
+.payout-bonus     { color: #22c55e; }
+.payout-divider   { border-top: 1px solid rgba(255,255,255,0.10); margin: 16px 0; }
+.payout-total     { display: flex; justify-content: space-between; align-items: center; }
+.payout-total-label { font-size: 14px; color: var(--text-secondary); }
+.payout-total-value {
+  font-size: 30px;
+  font-weight: 800;
+  color: #22c55e;
+  text-shadow: 0 0 20px rgba(34, 197, 94, 0.5);
+}
+
+/* Broker panel */
+.broker-item { display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; }
+.broker-empty { text-align: center; color: var(--text-muted); padding: 30px 0; font-size: 14px; }
+
+/* Balance info bar */
+.info-bar { font-size: 12px; color: var(--text-secondary); margin-bottom: 14px; }
+.info-bar span { color: var(--text-primary); font-weight: 600; }
